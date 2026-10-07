@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: distributed-job-queue
+  datasource:
+    # Dev defaults match compose.yaml; override with environment variables elsewhere.
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/jobqueue}
+    username: ${SPRING_DATASOURCE_USERNAME:jobqueue}
+    password: ${SPRING_DATASOURCE_PASSWORD:jobqueue}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  shutdown: graceful
