@@ -1,5 +1,6 @@
 package dev.jobqueue.job;
 
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -69,4 +70,46 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             """)
     int fail(@Param("id") UUID id, @Param("workerId") String workerId,
              @Param("error") String error);
+
+    /**
+     * Re-stamps up to {@code limit} PENDING/QUEUED rows untouched for {@code staleSeconds} as
+     * QUEUED and returns their ids. One statement, so concurrent sweepers (SKIP LOCKED) never
+     * receive the same row, and bumping updated_at means a row is picked up at most once per
+     * staleness window. Not {@code @Modifying}: it must return the RETURNING rows.
+     */
+    @Query(nativeQuery = true, value = """
+            UPDATE jobs SET status = 'QUEUED', queued_at = now(), updated_at = now()
+            WHERE id IN (
+                SELECT id FROM jobs
+                WHERE status IN ('PENDING', 'QUEUED')
+                  AND updated_at < now() - make_interval(secs => :staleSeconds)
+                ORDER BY updated_at
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED)
+            RETURNING id
+            """)
+    List<UUID> requeueStale(@Param("staleSeconds") double staleSeconds, @Param("limit") int limit);
+
+    /**
+     * Takes up to {@code limit} PROCESSING rows whose lease has expired away from their dead
+     * worker: QUEUED if attempts remain, otherwise FAILED. The attempt was already counted at
+     * claim time, so a crash consumes one.
+     */
+    @Query(nativeQuery = true, value = """
+            UPDATE jobs SET
+                status = CASE WHEN attempts < max_attempts THEN 'QUEUED' ELSE 'FAILED' END,
+                last_error = 'Lease expired: worker did not finish (attempt ' || attempts || ')',
+                locked_by = NULL, lease_expires_at = NULL,
+                queued_at = CASE WHEN attempts < max_attempts THEN now() ELSE queued_at END,
+                finished_at = CASE WHEN attempts < max_attempts THEN finished_at ELSE now() END,
+                updated_at = now()
+            WHERE id IN (
+                SELECT id FROM jobs
+                WHERE status = 'PROCESSING' AND lease_expires_at < now()
+                ORDER BY lease_expires_at
+                LIMIT :limit
+                FOR UPDATE SKIP LOCKED)
+            RETURNING id AS id, status AS status, attempts AS attempts
+            """)
+    List<RecoveredJob> reclaimExpiredLeases(@Param("limit") int limit);
 }
