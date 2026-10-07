@@ -97,11 +97,15 @@ public class WorkerPool implements SmartLifecycle {
                 queue.pop(properties.popTimeout()).ifPresent(id -> runner.run(id, workerId));
             } catch (Throwable t) {
                 if (t instanceof VirtualMachineError) {
+                    // The pool silently loses this worker; make that visible before the thread dies.
+                    log.error("Worker {} is dying from a fatal JVM error", workerId, t);
                     throw (VirtualMachineError) t;
                 }
                 if (!running) {
                     break;
                 }
+                // A stray interrupt while still running must not poison later pops or the backoff sleep.
+                Thread.interrupted();
                 // Typically Redis or PostgreSQL being briefly unavailable: back off, keep the worker alive.
                 log.error("Worker {} hit an error; continuing", workerId, t);
                 pause();

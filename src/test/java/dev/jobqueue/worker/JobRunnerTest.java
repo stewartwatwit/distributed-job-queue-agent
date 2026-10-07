@@ -173,15 +173,34 @@ class JobRunnerTest {
     }
 
     @Test
-    void interruptionLeavesJobProcessingAndKeepsInterruptFlag() throws Exception {
+    void interruptionIsRecordedAsRetryableFailureAndDoesNotLeaveInterruptFlagSet() throws Exception {
         claimedJob("TEST", 1, 3);
-        when(handler.handle(any())).thenThrow(new InterruptedException());
+        when(handler.handle(any())).thenThrow(new InterruptedException("stop"));
+        when(jobs.scheduleRetry(any(), any(), any())).thenReturn(true);
 
         runner.run(id, WORKER);
 
-        assertThat(Thread.currentThread().isInterrupted()).isTrue();
-        verify(jobs, never()).complete(any(), any(), any());
+        verify(jobs).scheduleRetry(eq(id), eq(WORKER), contains("InterruptedException"));
+        assertThat(Thread.currentThread().isInterrupted()).isFalse();
+    }
+
+    @Test
+    void handlerErrorIsRecordedInsteadOfStrandingTheJob() throws Exception {
+        claimedJob("TEST", 3, 3);
+        when(handler.handle(any())).thenThrow(new StackOverflowError());
+
+        runner.run(id, WORKER);
+
+        verify(jobs).fail(eq(id), eq(WORKER), contains("StackOverflowError"));
+    }
+
+    @Test
+    void fatalJvmErrorsAreRethrown() throws Exception {
+        claimedJob("TEST", 1, 3);
+        when(handler.handle(any())).thenThrow(new OutOfMemoryError());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> runner.run(id, WORKER))
+                .isInstanceOf(OutOfMemoryError.class);
         verify(jobs, never()).fail(any(), any(), any());
-        verify(jobs, never()).scheduleRetry(any(), any(), any());
     }
 }

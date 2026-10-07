@@ -59,12 +59,19 @@ public class JobRunner {
             JsonNode payload = mapper.readTree(job.getPayload());
             handler.validate(payload);
             resultJson = mapper.writeValueAsString(handler.handle(payload));
-        } catch (InterruptedException e) {
-            // Shutdown interrupted us mid-job. Leave it PROCESSING: the sweeper recovers it once the lease expires.
-            Thread.currentThread().interrupt();
-            log.warn("Job {} interrupted on {}; it will be recovered after its lease expires", jobId, workerId);
+        } catch (VirtualMachineError e) {
+            // A runaway handler overflowing its own stack is a per-job failure; OutOfMemoryError and
+            // friends mean the JVM itself is unhealthy and must not be swallowed.
+            if (!(e instanceof StackOverflowError)) {
+                throw e;
+            }
+            recordFailure(job, workerId, e);
             return;
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            // Includes InterruptedException (shutdown timeout, or a handler's own interrupt) and Errors
+            // such as StackOverflowError: the attempt is already counted, so record it and let the
+            // normal retry rules apply instead of stranding the job until its lease expires. The
+            // interrupt flag is deliberately not restored; WorkerPool checks its own stop flag.
             recordFailure(job, workerId, e);
             return;
         }
@@ -76,7 +83,7 @@ public class JobRunner {
         }
     }
 
-    private void recordFailure(Job job, String workerId, Exception error) {
+    private void recordFailure(Job job, String workerId, Throwable error) {
         String message = error.getClass().getName() + ": " + error.getMessage();
         boolean retryable = !(error instanceof NonRetryableJobException) && job.hasAttemptsLeft();
 
