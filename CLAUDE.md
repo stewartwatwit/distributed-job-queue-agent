@@ -428,3 +428,74 @@ The project is considered complete when:
 * the implementation is understandable enough to discuss in an interview
 
 Do not add unrelated features simply to make the project larger.
+
+## GitHub Workflow
+
+This project is hosted on GitHub.
+
+GitHub CLI (`gh`) is available for repository operations.
+
+Claude may use Git and GitHub CLI to:
+
+- create branches
+- inspect branches
+- commit changes
+- push branches
+- create pull requests
+- inspect pull requests
+- inspect GitHub Actions
+- review CI results
+
+### Branching
+
+Do not develop directly on `main` for feature work.
+
+Create a descriptive branch for each meaningful feature or change.
+
+Examples:
+
+- `feature/job-domain`
+- `feature/redis-queue`
+- `feature/worker-processing`
+- `test/concurrency`
+- `ci/github-actions`
+
+### Pull Requests
+
+When a meaningful feature is complete:
+
+1. Run relevant tests.
+2. Review the diff.
+3. Commit the changes.
+4. Push the branch.
+5. Create a pull request.
+6. Provide a useful PR title and description.
+7. Wait for CI.
+8. Review CI results.
+9. Do not merge the PR unless explicitly instructed.
+
+### Commits
+
+Use focused commits.
+
+Do not combine unrelated changes into a single commit.
+
+### Main Branch
+
+Never force-push to `main`.
+
+Do not merge pull requests without explicit approval.
+
+### CI
+
+After creating a PR, inspect the GitHub Actions results.
+
+If CI fails:
+
+1. Determine the cause.
+2. Fix the issue.
+3. Run the relevant tests locally.
+4. Commit and push the fix.
+5. Re-check CI.
+
+Do not simply ignore failing CI.
