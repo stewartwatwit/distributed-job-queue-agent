@@ -29,13 +29,16 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             """)
     int markQueued(@Param("id") UUID id);
 
-    /** QUEUED -> PROCESSING. Counts the attempt and takes a lease owned by {@code workerId}. */
+    /**
+     * QUEUED -> PROCESSING. Counts the attempt and takes a lease owned by {@code workerId}. Refuses a
+     * job that has used all its attempts, so a stray duplicate message can never run attempt max+1.
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(nativeQuery = true, value = """
             UPDATE jobs SET status = 'PROCESSING', attempts = attempts + 1, locked_by = :workerId,
                 lease_expires_at = now() + make_interval(secs => :leaseSeconds),
                 started_at = now(), updated_at = now()
-            WHERE id = :id AND status = 'QUEUED'
+            WHERE id = :id AND status = 'QUEUED' AND attempts < max_attempts
             """)
     int claim(@Param("id") UUID id, @Param("workerId") String workerId,
               @Param("leaseSeconds") double leaseSeconds);
