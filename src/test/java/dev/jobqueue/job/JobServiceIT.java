@@ -100,6 +100,17 @@ class JobServiceIT {
     }
 
     @Test
+    void claimRefusesJobThatHasUsedAllItsAttempts() {
+        UUID id = queuedJob(1);
+        assertThat(service.claim(id, "worker-1")).isTrue();
+        // simulate a (buggy or racing) requeue of an exhausted job
+        assertThat(service.scheduleRetry(id, "worker-1", "boom")).isTrue();
+
+        assertThat(service.claim(id, "worker-2")).isFalse();
+        assertThat(service.get(id).getAttempts()).isEqualTo(1);
+    }
+
+    @Test
     void completeRecordsResultAndClearsLease() {
         UUID id = queuedJob(null);
         service.claim(id, "worker-1");

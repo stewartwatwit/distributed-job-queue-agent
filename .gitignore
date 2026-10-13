@@ -4,3 +4,4 @@ target/
 *.iml
 .env
 *.log
+.claude/worktrees/
