@@ -20,7 +20,7 @@ failed jobs, duplicate handling and queue/database consistency.
   script atomically, so two nodes moving at once can never move an id twice.
 - **Recovery has a single mechanism**: if a message is lost (Redis restart, crash between pop and
   claim), the job is still `QUEUED` in PostgreSQL and the sweeper re-enqueues it
-  ([sweeper design](recovery-sweeper.md)).
+  ([sweeper design](0005-recovery-sweeper.md)).
 - **No Redis dead-letter list.** Permanently failed jobs are `FAILED` rows, queryable through the API.
 
 ## Alternatives considered

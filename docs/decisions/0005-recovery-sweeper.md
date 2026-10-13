@@ -1,4 +1,4 @@
-# Recovery sweeper
+# ADR 0005: Recovery sweeper
 
 ## Problem
 
@@ -36,4 +36,4 @@ Properties: `jobqueue.sweeper.{enabled, delayed-interval, stale-interval, lease-
 - **Recovery latency.** A lost message is repaired within threshold + sweep interval (about 5.5 minutes by default). Lowering the threshold trades latency for more duplicates.
 - **Lease-expiry retry goes via the delayed set.** If that Redis write fails, the job waits for the stale pass (threshold + interval) instead of the backoff delay.
 - **Every instance runs the sweeper.** That is deliberate: `SKIP LOCKED` and the atomic Redis move make it safe, so there is no leader election. The cost is some redundant polling.
-- **Index.** `idx_jobs_status_queued_at` does not match the `updated_at` predicate. At this scale the scan is fine; an index on `(status, updated_at)` is the follow-up if the table grows.
+- **Index.** `idx_jobs_status_queued_at` did not match the `updated_at` predicate, so migration V2 replaced it with `idx_jobs_status_updated_at (status, updated_at)`.

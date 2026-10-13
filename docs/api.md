@@ -74,7 +74,7 @@ message (kept while a retry is pending and on terminal failure).
 
 | Status       | Meaning |
 |--------------|---------|
-| `PENDING`    | Persisted, not yet confirmed in the queue (transient during submit) |
+| `PENDING`    | Persisted, not yet released to workers (transient during submit) |
 | `QUEUED`     | Waiting for a worker, including waiting for a retry |
 | `PROCESSING` | Claimed by a worker |
 | `COMPLETED`  | Finished successfully (terminal) |

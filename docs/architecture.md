@@ -63,8 +63,9 @@ Schema is owned by Flyway (`V1__create_jobs.sql`); Hibernate only validates it.
 | `locked_by`, `lease_expires_at` | which worker holds the job and until when |
 | `created_at`, `updated_at`, `queued_at`, `started_at`, `finished_at` | timestamps |
 
-Indexes: `(status, queued_at)`, partial `(lease_expires_at) WHERE status = 'PROCESSING'`,
-`(created_at DESC)`.
+Indexes: `(status, updated_at)` (sweeper's stale scan), partial `(lease_expires_at) WHERE status =
+'PROCESSING'` (expired leases), `(created_at DESC)` (listing). The `(status, updated_at)` index
+arrives in migration V2, which replaces V1's `(status, queued_at)`.
 
 ## Redis structures
 
@@ -91,7 +92,7 @@ Only job ids are stored; payloads never leave PostgreSQL. See
 
 No transaction is ever open while a handler runs, and lease times use the database clock. Details:
 [ADR 0001](decisions/0001-conditional-updates-for-concurrency.md),
-[sweeper design](decisions/recovery-sweeper.md).
+[sweeper design](decisions/0005-recovery-sweeper.md).
 
 ## Failure handling and retries
 

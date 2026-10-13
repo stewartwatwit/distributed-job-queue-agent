@@ -20,9 +20,11 @@
   only computes the delay, which keeps it trivially testable.
 - **Every handler `Throwable` is recorded**, including `InterruptedException` (shutdown timeout) and
   `StackOverflowError`. Only fatal JVM errors (`OutOfMemoryError`, …) propagate, because the process
-  is no longer trustworthy. Found in concurrency review: swallowing interrupts used to leave the
-  thread's interrupt flag set and spin the worker loop, and not recording `Error`s stranded jobs
-  until their lease expired.
+  is no longer trustworthy. Recording them (rather than leaving the job `PROCESSING`) means a
+  failing job follows the normal retry rules instead of waiting for its lease to expire, and the
+  thread's interrupt flag is not left set, which would spin the worker loop.
+- A worker thread that dies from a fatal JVM error is not replaced; the pool silently loses
+  capacity (it is logged first). Restarting the process is the remedy.
 - Failures never take a worker down: unexpected errors in the poll loop are logged, the worker backs
   off for a second and continues (typical cause: Redis or PostgreSQL briefly unavailable).
 
