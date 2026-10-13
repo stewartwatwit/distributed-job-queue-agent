@@ -29,3 +29,14 @@ jobs:
           path: |
             target/surefire-reports
             target/failsafe-reports
+
+  # Builds the Docker image and exercises the real multi-container stack
+  # (api + 3 workers + postgres + redis). Build-only: nothing is pushed anywhere.
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Smoke test (builds image, starts stack, submits jobs, tears down)
+        run: ./scripts/smoke-test.sh
