@@ -2,6 +2,7 @@ package dev.jobqueue.job;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -73,6 +74,18 @@ public class JobService {
     @Transactional
     public boolean fail(UUID id, String workerId, String error) {
         return jobs.fail(id, workerId, truncate(error)) == 1;
+    }
+
+    /** Re-stamps stale PENDING/QUEUED jobs as QUEUED; the caller must push the ids to Redis. */
+    @Transactional
+    public List<UUID> requeueStale(Duration staleAfter, int limit) {
+        return jobs.requeueStale(staleAfter.toMillis() / 1000.0, limit);
+    }
+
+    /** Releases jobs whose worker lease expired; see {@link JobRepository#reclaimExpiredLeases}. */
+    @Transactional
+    public List<RecoveredJob> reclaimExpiredLeases(int limit) {
+        return jobs.reclaimExpiredLeases(limit);
     }
 
     static String truncate(String error) {
