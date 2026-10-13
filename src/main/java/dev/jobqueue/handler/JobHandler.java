@@ -15,7 +15,8 @@ public interface JobHandler {
 
     /**
      * Rejects payloads this handler can never process. Called at submit time (so clients get a
-     * 400 instead of a doomed job) and again before execution.
+     * 400 instead of a doomed job) and again by the worker just before {@link #handle}, so
+     * {@code handle} may assume a valid payload.
      *
      * @throws InvalidJobPayloadException if the payload is unusable
      */

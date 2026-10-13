@@ -59,19 +59,16 @@ public class JobRunner {
             JsonNode payload = mapper.readTree(job.getPayload());
             handler.validate(payload);
             resultJson = mapper.writeValueAsString(handler.handle(payload));
-        } catch (VirtualMachineError e) {
-            // A runaway handler overflowing its own stack is a per-job failure; OutOfMemoryError and
-            // friends mean the JVM itself is unhealthy and must not be swallowed.
-            if (!(e instanceof StackOverflowError)) {
-                throw e;
-            }
-            recordFailure(job, workerId, e);
-            return;
         } catch (Throwable e) {
-            // Includes InterruptedException (shutdown timeout, or a handler's own interrupt) and Errors
-            // such as StackOverflowError: the attempt is already counted, so record it and let the
-            // normal retry rules apply instead of stranding the job until its lease expires. The
-            // interrupt flag is deliberately not restored; WorkerPool checks its own stop flag.
+            // OutOfMemoryError and friends mean the JVM itself is unhealthy: don't swallow them. A
+            // StackOverflowError is just a runaway handler, so it is a per-job failure like any other.
+            if (e instanceof VirtualMachineError && !(e instanceof StackOverflowError)) {
+                throw (VirtualMachineError) e;
+            }
+            // Includes InterruptedException (shutdown timeout, or a handler's own interrupt): the
+            // attempt is already counted, so record it and let the normal retry rules apply instead
+            // of stranding the job until its lease expires. The interrupt flag is deliberately not
+            // restored; WorkerPool checks its own stop flag.
             recordFailure(job, workerId, e);
             return;
         }
