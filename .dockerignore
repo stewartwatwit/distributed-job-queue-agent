@@ -1,0 +1,12 @@
+.git
+.github
+.claude
+.idea
+.vscode
+target
+.env
+*.log
+docs
+scripts
+compose.yaml
+*.md
