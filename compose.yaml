@@ -1,4 +1,5 @@
-# Local infrastructure. Start with: docker compose up -d
+# Local infrastructure. Start with: docker compose up -d  (postgres + redis only)
+# Full stack (api + workers): docker compose --profile app up -d --build --scale worker=3
 # Credentials are development-only defaults; override via environment or a local .env (gitignored).
 services:
   postgres:
@@ -8,7 +9,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-jobqueue}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jobqueue}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -20,12 +21,50 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # ---- Opt-in application containers: docker compose --profile app up --build ----
+  # Default `docker compose up -d` still starts only postgres + redis.
+  api:
+    profiles: [app]
+    build: .
+    image: jobqueue-app:local
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      <<: &app-env
+        SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-jobqueue}
+        SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-jobqueue}
+        SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-jobqueue}
+        SPRING_DATA_REDIS_HOST: redis
+        SPRING_DATA_REDIS_PORT: "6379"
+      # The API only accepts requests; the sweeper (recovery) runs here, not in workers.
+      JOBQUEUE_WORKER_ENABLED: "false"
+      JOBQUEUE_SWEEPER_ENABLED: "true"
+    depends_on: &infra
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    profiles: [app]
+    image: jobqueue-app:local
+    pull_policy: never   # built by the api service; scale with --scale worker=N
+    environment:
+      <<: *app-env
+      JOBQUEUE_WORKER_ENABLED: "true"
+      JOBQUEUE_WORKER_CONCURRENCY: ${JOBQUEUE_WORKER_CONCURRENCY:-4}
+      JOBQUEUE_SWEEPER_ENABLED: "false"
+    depends_on:
+      <<: *infra
+      api:
+        condition: service_healthy   # api runs the Flyway migrations first
 
 volumes:
   postgres-data:
