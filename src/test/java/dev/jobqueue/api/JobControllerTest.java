@@ -248,4 +248,10 @@ class JobControllerTest {
         mvc.perform(get("/api/v1/jobs").param("page", "-1")).andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/jobs").param("size", "0")).andExpect(status().isBadRequest());
     }
+
+    @Test
+    void listRejectsPagesBeyondTheMaximum() throws Exception {
+        mvc.perform(get("/api/v1/jobs").param("page", String.valueOf(JobController.MAX_PAGE + 1)))
+                .andExpect(status().isBadRequest());
+    }
 }

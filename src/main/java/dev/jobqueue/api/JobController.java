@@ -6,6 +6,7 @@ import dev.jobqueue.job.JobService;
 import dev.jobqueue.job.JobStatus;
 import dev.jobqueue.job.JobSubmissionService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.util.UUID;
@@ -28,6 +29,8 @@ public class JobController {
 
     static final int DEFAULT_PAGE_SIZE = 20;
     static final int MAX_PAGE_SIZE = 100;
+    /** Deep pages mean huge OFFSETs; nothing legitimate pages this far. */
+    static final int MAX_PAGE = 10_000;
 
     private final JobSubmissionService submissions;
     private final JobService jobs;
@@ -62,7 +65,7 @@ public class JobController {
     /** Newest first. Sizes above {@link #MAX_PAGE_SIZE} are capped rather than rejected. */
     @GetMapping
     public JobPageResponse list(@RequestParam(required = false) JobStatus status,
-                                @RequestParam(defaultValue = "0") @Min(0) int page,
+                                @RequestParam(defaultValue = "0") @Min(0) @Max(MAX_PAGE) int page,
                                 @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) @Min(1) int size) {
         PageRequest pageable = PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE),
                 Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id")));
