@@ -38,7 +38,7 @@ class JobSubmissionServiceTest {
     void setUp() {
         JobHandlerRegistry registry = new JobHandlerRegistry(
                 List.of(new EchoHandler(mapper), new ChecksumHandler(mapper)));
-        service = new JobSubmissionService(registry, jobs, queue, mapper);
+        service = new JobSubmissionService(registry, jobs, queue, mapper, 100);
         stored = Job.create("ECHO", "{\"a\":1}", 3, Instant.parse("2026-01-01T00:00:00Z"));
         when(jobs.submit(anyString(), anyString(), any())).thenReturn(stored);
         when(jobs.get(stored.getId())).thenReturn(stored);
@@ -87,6 +87,16 @@ class JobSubmissionServiceTest {
     void invalidPayloadIsRejectedBeforePersisting() {
         assertThatThrownBy(() -> service.submit("CHECKSUM", json("{}"), null))
                 .isInstanceOf(InvalidJobPayloadException.class);
+        verifyNoInteractions(jobs, queue);
+    }
+
+    @Test
+    void oversizedPayloadIsRejectedBeforePersisting() {
+        String big = "{\"text\":\"" + "x".repeat(200) + "\"}";
+
+        assertThatThrownBy(() -> service.submit("ECHO", json(big), null))
+                .isInstanceOf(InvalidJobPayloadException.class)
+                .hasMessageContaining("exceeds 100 bytes");
         verifyNoInteractions(jobs, queue);
     }
 }

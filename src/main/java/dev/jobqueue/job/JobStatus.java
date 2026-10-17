@@ -12,7 +12,7 @@ import java.util.Set;
  *               +-- retry --+---> FAILED
  * </pre>
  *
- * PENDING means "persisted but not yet confirmed in Redis". The rules here document and unit-test
+ * PENDING means "persisted but not yet released to workers" (see docs/decisions/0003). The rules here document and unit-test
  * the lifecycle; the actual enforcement under concurrency is done by the conditional UPDATEs in
  * {@link JobRepository}.
  */

@@ -22,7 +22,7 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
     Page<Job> findByStatus(JobStatus status, Pageable pageable);
 
-    /** PENDING -> QUEUED, once the id is confirmed to be in Redis. */
+    /** PENDING -> QUEUED: releases the job to workers. Must commit before the id is pushed to Redis. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(nativeQuery = true, value = """
             UPDATE jobs SET status = 'QUEUED', queued_at = now(), updated_at = now()

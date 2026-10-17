@@ -68,14 +68,53 @@ class SweeperTest {
     }
 
     @Test
-    void databaseFailureIsSwallowed() {
+    void staleRequeueDatabaseFailureIsSwallowed() {
         when(jobs.requeueStale(STALE, 2)).thenThrow(new IllegalStateException("db down"));
-        when(jobs.reclaimExpiredLeases(2)).thenThrow(new IllegalStateException("db down"));
-        when(queue.moveDueJobs(any(), anyInt())).thenThrow(new IllegalStateException("redis down"));
 
         assertThat(sweeper.requeueStale(STALE)).isZero();
+    }
+
+    @Test
+    void leaseReclaimDatabaseFailureIsSwallowed() {
+        when(jobs.reclaimExpiredLeases(2)).thenThrow(new IllegalStateException("db down"));
+
         assertThat(sweeper.reclaimExpiredLeases()).isZero();
+    }
+
+    @Test
+    void delayedMoveRedisFailureIsSwallowed() {
+        when(queue.moveDueJobs(any(), anyInt())).thenThrow(new IllegalStateException("redis down"));
+
         assertThat(sweeper.moveDueJobs()).isZero();
+    }
+
+    @Test
+    void redisFailureWhileSchedulingRecoveredRetryDoesNotAbortTheBatch() {
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        List<RecoveredJob> batch = List.of(recovered(first, JobStatus.QUEUED, 1), recovered(second, JobStatus.QUEUED, 1));
+        when(jobs.reclaimExpiredLeases(2)).thenReturn(batch).thenReturn(List.of());
+        doThrow(new IllegalStateException("redis down")).when(queue).enqueueDelayed(eq(first), any());
+
+        assertThat(sweeper.reclaimExpiredLeases()).isEqualTo(2);
+
+        verify(queue).enqueueDelayed(eq(second), any());
+    }
+
+    @Test
+    void staleRequeueIsCappedPerRun() {
+        when(jobs.requeueStale(STALE, 2)).thenReturn(List.of(UUID.randomUUID(), UUID.randomUUID()));
+
+        assertThat(sweeper.requeueStale(STALE)).isEqualTo(2 * Sweeper.MAX_BATCHES_PER_RUN);
+    }
+
+    @Test
+    void leaseReclaimIsCappedPerRun() {
+        List<RecoveredJob> batch = List.of(
+                recovered(UUID.randomUUID(), JobStatus.FAILED, 3), recovered(UUID.randomUUID(), JobStatus.FAILED, 3));
+        when(jobs.reclaimExpiredLeases(2)).thenReturn(batch);
+
+        assertThat(sweeper.reclaimExpiredLeases()).isEqualTo(2 * Sweeper.MAX_BATCHES_PER_RUN);
     }
 
     @Test

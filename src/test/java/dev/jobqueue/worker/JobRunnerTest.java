@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -202,5 +203,25 @@ class JobRunnerTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> runner.run(id, WORKER))
                 .isInstanceOf(OutOfMemoryError.class);
         verify(jobs, never()).fail(any(), any(), any());
+    }
+
+    @Test
+    void payloadRejectedByHandlerAtRunTimeFailsPermanently() throws Exception {
+        claimedJob("TEST", 1, 3);
+        doThrow(new dev.jobqueue.handler.InvalidJobPayloadException("bad row")).when(handler).validate(any());
+
+        runner.run(id, WORKER);
+
+        verify(handler, never()).handle(any());
+        verify(jobs).fail(eq(id), eq(WORKER), contains("bad row"));
+    }
+
+    @Test
+    void lostLeaseOnFinalFailureIsTolerated() throws Exception {
+        claimedJob("TEST", 3, 3);
+        when(handler.handle(any())).thenThrow(new IllegalStateException("boom"));
+        when(jobs.fail(any(), any(), any())).thenReturn(false);
+
+        runner.run(id, WORKER); // must not throw
     }
 }

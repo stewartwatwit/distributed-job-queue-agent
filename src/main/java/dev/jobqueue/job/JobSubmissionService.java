@@ -1,9 +1,12 @@
 package dev.jobqueue.job;
 
+import dev.jobqueue.handler.InvalidJobPayloadException;
 import dev.jobqueue.handler.JobHandlerRegistry;
 import dev.jobqueue.queue.JobQueue;
+import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -23,12 +26,15 @@ public class JobSubmissionService {
     private final JobService jobs;
     private final JobQueue queue;
     private final JsonMapper mapper;
+    private final int maxPayloadBytes;
 
-    public JobSubmissionService(JobHandlerRegistry handlers, JobService jobs, JobQueue queue, JsonMapper mapper) {
+    public JobSubmissionService(JobHandlerRegistry handlers, JobService jobs, JobQueue queue, JsonMapper mapper,
+                                @Value("${jobqueue.job.max-payload-bytes:65536}") int maxPayloadBytes) {
         this.handlers = handlers;
         this.jobs = jobs;
         this.queue = queue;
         this.mapper = mapper;
+        this.maxPayloadBytes = maxPayloadBytes;
     }
 
     /**
@@ -38,7 +44,13 @@ public class JobSubmissionService {
     public Job submit(String type, JsonNode payload, Integer maxAttempts) {
         handlers.get(type).validate(payload);
 
-        Job job = jobs.submit(type, mapper.writeValueAsString(payload), maxAttempts);
+        // Payloads are stored as JSONB and echoed back by the API, so bound their size.
+        String payloadJson = mapper.writeValueAsString(payload);
+        if (payloadJson.getBytes(StandardCharsets.UTF_8).length > maxPayloadBytes) {
+            throw new InvalidJobPayloadException("payload exceeds " + maxPayloadBytes + " bytes");
+        }
+
+        Job job = jobs.submit(type, payloadJson, maxAttempts);
 
         // QUEUED must be committed before the id is visible to workers: a worker only claims
         // QUEUED jobs, so popping the id while the row is still PENDING would drop the message.

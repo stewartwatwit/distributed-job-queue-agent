@@ -32,7 +32,6 @@ public class SleepHandler implements JobHandler {
 
     @Override
     public JsonNode handle(JsonNode payload) throws InterruptedException {
-        validate(payload);
         long millis = payload.get("millis").asLong();
         Thread.sleep(millis);
         ObjectNode result = mapper.createObjectNode();

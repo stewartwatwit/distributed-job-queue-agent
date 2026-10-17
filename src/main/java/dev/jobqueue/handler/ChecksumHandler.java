@@ -34,7 +34,6 @@ public class ChecksumHandler implements JobHandler {
 
     @Override
     public JsonNode handle(JsonNode payload) throws NoSuchAlgorithmException {
-        validate(payload);
         byte[] digest = MessageDigest.getInstance("SHA-256")
                 .digest(payload.get("text").asString().getBytes(StandardCharsets.UTF_8));
         ObjectNode result = mapper.createObjectNode();

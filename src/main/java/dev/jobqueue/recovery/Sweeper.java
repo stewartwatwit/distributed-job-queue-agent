@@ -9,6 +9,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +55,11 @@ public class Sweeper {
         this.clock = clock;
         this.staleAfter = staleAfter;
         this.batchSize = batchSize;
+    }
+
+    @PostConstruct
+    void logStarted() {
+        log.info("Sweeper enabled (stale after {}, batch size {})", staleAfter, batchSize);
     }
 
     @Scheduled(fixedDelayString = "${jobqueue.sweeper.delayed-interval:1s}")
